@@ -63,7 +63,6 @@ void Display::Update()
         if (e.type == SDL_QUIT)
         {
             this->m_isClosed = true;
-            printf("da fuk\n");
         }
     }
 }
