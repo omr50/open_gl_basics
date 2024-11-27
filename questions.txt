@@ -1,0 +1,8 @@
+- how do vertex buffer objects work
+- how do vertex array objects work
+- how does the state machine work
+- how to keep a mental model to properly understand why things are needed
+- why do we need to represent the data as consecutive arrays using attribs
+- what exactly are attribs
+- look into the code where we have the vao and vab and why is there multiple (array)
+  (basically how is it used)
