@@ -6,11 +6,13 @@
 #include <string>
 #include <iostream>
 
+#define PI 3.14159265358979323846
 #define WIDTH = 800
 #define HEIGHT = 600
 
 void render_triangle(SDL_Window *window);
 std::string get_shader_program_string(std::string filepath);
+void rotate_traingle(glm::vec3 triangle[], float angle);
 
 int main()
 {
@@ -72,10 +74,14 @@ std::string get_shader_program_string(std::string filepath)
 void render_triangle(SDL_Window *window)
 {
     // set up vertices
-    glm::vec3 vertices[] = {(glm::vec3(-0.5, -0.5, 0)),
-                            (glm::vec3(0, 0.5, 0)),
-                            (glm::vec3(0.5, -0.5, 0))};
-    glm::vec2 centroid = glm::vec2(0.0, -0.5 / 3.0);
+    glm::vec3 vertices[] = {(glm::vec3(0, 0, 1)),
+                            (glm::vec3(0.5, 0.75, 1)),
+                            (glm::vec3(1, 0, 1))};
+    glm::vec2 centroid = glm::vec2(1.5 / 3.0, 0.75 / 3.0);
+
+    vertices[0].x -= centroid.x;
+    vertices[1].x -= centroid.x;
+    vertices[2].x -= centroid.x;
 
     vertices[0].y -= centroid.y;
     vertices[1].y -= centroid.y;
@@ -135,6 +141,8 @@ void render_triangle(SDL_Window *window)
         glGetProgramInfoLog(shader_program, sizeof(errbuff), &length, errbuff);
         std::cerr << "Invalid Program: " << errbuff << std::endl;
     }
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
 
     // set up vbo and vao
 
@@ -154,14 +162,16 @@ void render_triangle(SDL_Window *window)
     {
         count++;
         printf("%d\n", count);
-        vertices[0].x = vertices[0].x * glm::cos(0.0174533) - vertices[0].y * glm::sin(0.0174533);
-        vertices[0].y = vertices[0].x * glm::sin(0.0174533) + vertices[0].y * glm::cos(0.0174533);
+        // vertices[0].x = vertices[0].x * glm::cos(0.0174533) - vertices[0].y * glm::sin(0.0174533);
+        // vertices[0].y = vertices[0].x * glm::sin(0.0174533) + vertices[0].y * glm::cos(0.0174533);
 
-        vertices[1].x = vertices[1].x * glm::cos(0.0174533) - vertices[1].y * glm::sin(0.0174533);
-        vertices[1].y = vertices[1].x * glm::sin(0.0174533) + vertices[1].y * glm::cos(0.0174533);
+        // vertices[1].x = vertices[1].x * glm::cos(0.0174533) - vertices[1].y * glm::sin(0.0174533);
+        // vertices[1].y = vertices[1].x * glm::sin(0.0174533) + vertices[1].y * glm::cos(0.0174533);
 
-        vertices[2].x = vertices[2].x * glm::cos(0.0174533) - vertices[2].y * glm::sin(0.0174533);
-        vertices[2].y = vertices[2].x * glm::sin(0.0174533) + vertices[2].y * glm::cos(0.0174533);
+        // vertices[2].x = vertices[2].x * glm::cos(0.0174533) - vertices[2].y * glm::sin(0.0174533);
+        // vertices[2].y = vertices[2].x * glm::sin(0.0174533) + vertices[2].y * glm::cos(0.0174533);
+        if (count < 361)
+            rotate_traingle(vertices, 1);
 
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
         // draw
@@ -182,5 +192,15 @@ void render_triangle(SDL_Window *window)
                 exit(0);
             }
         }
+    }
+}
+
+void rotate_traingle(glm::vec3 triangle[], float angle)
+{
+    float rad_angle = angle * PI / 180.0f;
+    for (int i = 0; i < 3; i++)
+    {
+        triangle[i].x = triangle[i].x * glm::cos(rad_angle) - triangle[i].y * glm::sin(rad_angle);
+        triangle[i].y = triangle[i].x * glm::sin(rad_angle) + triangle[i].y * glm::cos(rad_angle);
     }
 }
