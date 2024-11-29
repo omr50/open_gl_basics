@@ -8,9 +8,14 @@
 #include <vector>
 
 #define PI 3.14159265358979323846
-#define WIDTH = 800
-#define HEIGHT = 600
+#define WIDTH 800
+#define HEIGHT 600
 
+enum TYPE
+{
+    HERO,
+    ENEMY
+};
 struct Triangle
 {
     GLuint vbo;
@@ -18,14 +23,18 @@ struct Triangle
     glm::vec3 vertices[3];
     glm::vec3 temp[3];
     std::vector<Triangle *> *draw_queue;
+    TYPE type;
 };
 
 void render_triangle(SDL_Window *window);
 std::string get_shader_program_string(std::string filepath);
-void rotate_triangle(Triangle *triangle, float angle);
-void move_triangle(glm::vec3 triangle[], std::string dir);
+void rotate_triangle_to_point(Triangle *triangle, float x, float y, float offset);
+void move_triangle(Triangle *triangle, std::string dir);
 glm::vec2 compute_center(glm::vec3 triangle[]);
 void load_and_draw(Triangle *triangle);
+float normalize_x(int x);
+float normalize_y(int y);
+glm::vec2 normalize_xy(int x, int y);
 
 std::vector<Triangle *> draw_queue;
 
@@ -172,33 +181,41 @@ void render_triangle(SDL_Window *window)
     hero_triangle.vertices[0] = glm::vec3(0, 0, 1);
     hero_triangle.vertices[1] = glm::vec3(0.25, 0.375, 1);
     hero_triangle.vertices[2] = glm::vec3(0.5, 0, 1);
-    hero_triangle.draw_queue = &draw_queue;
 
+    hero_triangle.temp[0] = glm::vec3(0, 0, 1);
+    hero_triangle.temp[1] = glm::vec3(0.25, 0.375, 1);
+    hero_triangle.temp[2] = glm::vec3(0.5, 0, 1);
+
+    hero_triangle.draw_queue = &draw_queue;
+    hero_triangle.type = HERO;
     draw_queue.push_back(&hero_triangle);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(hero_triangle.vertices), hero_triangle.vertices, GL_STATIC_DRAW);
 
     glGenVertexArrays(1, &hero_triangle.vao);
     glBindVertexArray(hero_triangle.vao);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
     glEnableVertexArrayAttrib(hero_triangle.vao, 0);
-    glUseProgram(shader_program);
 
     // enemies
     Triangle enemy_triangle;
-    glGenBuffers(1, &hero_triangle.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, hero_triangle.vbo);
+    glGenBuffers(1, &enemy_triangle.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, enemy_triangle.vbo);
     enemy_triangle.vertices[0] = glm::vec3(0, 0, 1);
-    enemy_triangle.vertices[1] = glm::vec3(0.25, 0.375, 1);
-    enemy_triangle.vertices[2] = glm::vec3(0.5, 0, 1);
-    enemy_triangle.draw_queue = &draw_queue;
-    draw_queue.push_back(&enemy_triangle);
+    enemy_triangle.vertices[1] = glm::vec3(0.01, 0.1, 1);
+    enemy_triangle.vertices[2] = glm::vec3(0.02, 0, 1);
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(enemy_triangle.vertices), enemy_triangle.vertices, GL_STATIC_DRAW);
+    enemy_triangle.temp[0] = glm::vec3(0, 0, 1);
+    enemy_triangle.temp[1] = glm::vec3(0.25, 0.375, 1);
+    enemy_triangle.temp[2] = glm::vec3(0.5, 0, 1);
+
+    enemy_triangle.draw_queue = &draw_queue;
+    enemy_triangle.type = ENEMY;
+    draw_queue.push_back(&enemy_triangle);
 
     glGenVertexArrays(1, &enemy_triangle.vao);
     glBindVertexArray(enemy_triangle.vao);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
     glEnableVertexArrayAttrib(enemy_triangle.vao, 0);
+
     glUseProgram(shader_program);
 
     int count = 0;
@@ -221,62 +238,40 @@ void render_triangle(SDL_Window *window)
             {
                 if (e.key.keysym.sym == SDLK_w)
                 {
-                    move_triangle(hero_triangle.vertices, "up");
-                    printf("up\n");
+                    move_triangle(&hero_triangle, "up");
                 }
                 if (e.key.keysym.sym == SDLK_d)
                 {
-                    move_triangle(hero_triangle.vertices, "right");
-                    printf("right\n");
+                    move_triangle(&hero_triangle, "right");
                 }
                 if (e.key.keysym.sym == SDLK_a)
                 {
-                    move_triangle(hero_triangle.vertices, "left");
-                    printf("left\n");
+                    move_triangle(&hero_triangle, "left");
                 }
                 if (e.key.keysym.sym == SDLK_s)
                 {
-                    move_triangle(hero_triangle.vertices, "down");
-                    printf("down\n");
+                    move_triangle(&hero_triangle, "down");
                 }
             }
             else if (e.type == SDL_MOUSEMOTION)
             {
                 int x, y;
                 SDL_GetMouseState(&x, &y);
-                const int screen_width = 800;
-                const int screen_height = 600;
-
-                // Normalize mouse coordinates to OpenGL's [-1, 1] range
-                float normalized_x = (x / (float)screen_width) * 2.0f - 1.0f;
-                float normalized_y = 1.0f - (y / (float)screen_height) * 2.0f;
-
-                // Compute triangle center in OpenGL coordinates
-                glm::vec2 center = compute_center(hero_triangle.vertices);
-
-                // Calculate the angle between the mouse and the triangle's center
-                float opposite = normalized_y - center.y;
-                float adjacent = normalized_x - center.x;
-                float theta = atan2(opposite, adjacent);
-                theta += glm::radians(30.0f);
-                printf("Theta value %f\n", theta * 180.0 / PI);
-                rotate_triangle(&hero_triangle, theta);
+                auto coords = normalize_xy(x, y);
+                rotate_triangle_to_point(&hero_triangle, coords.x, coords.y, 30.0);
             }
         }
-        // vertices[0].x = vertices[0].x * glm::cos(0.0174533) - vertices[0].y * glm::sin(0.0174533);
-        // vertices[0].y = vertices[0].x * glm::sin(0.0174533) + vertices[0].y * glm::cos(0.0174533);
-
-        // vertices[1].x = vertices[1].x * glm::cos(0.0174533) - vertices[1].y * glm::sin(0.0174533);
-        // vertices[1].y = vertices[1].x * glm::sin(0.0174533) + vertices[1].y * glm::cos(0.0174533);
-
-        // vertices[2].x = vertices[2].x * glm::cos(0.0174533) - vertices[2].y * glm::sin(0.0174533);
-        // vertices[2].y = vertices[2].x * glm::sin(0.0174533) + vertices[2].y * glm::cos(0.0174533);
-        // rotate_triangle(temp_triangle, vertices, rotation_angle);
         // draw
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // glBindVertexArray(vao);
         for (auto &item : draw_queue)
         {
+            if (item->type == ENEMY)
+            {
+                auto hero_triangle = draw_queue[0];
+                auto coords = compute_center(hero_triangle->vertices);
+                rotate_triangle_to_point(item, coords.x, coords.y, 270.0f);
+            }
             load_and_draw(item);
         }
 
@@ -285,7 +280,7 @@ void render_triangle(SDL_Window *window)
     }
 }
 
-void move_triangle(glm::vec3 triangle[], std::string dir)
+void move_triangle(Triangle *triangle, std::string dir)
 {
     float adder = 1.0 / 60;
     if (dir == "left" || dir == "down")
@@ -296,12 +291,18 @@ void move_triangle(glm::vec3 triangle[], std::string dir)
     if (dir == "left" || dir == "right")
     {
         for (int i = 0; i < 3; i++)
-            triangle[i].x += adder;
+        {
+            triangle->vertices[i].x += adder;
+            triangle->temp[i].x += adder;
+        }
     }
     else
     {
         for (int i = 0; i < 3; i++)
-            triangle[i].y += adder;
+        {
+            triangle->vertices[i].y += adder;
+            triangle->temp[i].y += adder;
+        }
     }
 }
 
@@ -321,8 +322,17 @@ glm::vec2 compute_center(glm::vec3 triangle[])
     return centroid;
 }
 
-void rotate_triangle(Triangle *triangle, float angle)
+void rotate_triangle_to_point(Triangle *triangle, float x, float y, float offset)
 {
+
+    // Compute triangle center in OpenGL coordinates
+    glm::vec2 center = compute_center(triangle->vertices);
+
+    // Calculate the angle between the mouse and the triangle's center
+    float opposite = y - center.y;
+    float adjacent = x - center.x;
+    float angle = atan2(opposite, adjacent);
+    angle += glm::radians(offset);
 
     for (int i = 0; i < 3; i++)
     {
@@ -353,9 +363,29 @@ void rotate_triangle(Triangle *triangle, float angle)
 
 void load_and_draw(Triangle *triangle)
 {
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle->temp), triangle->temp, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, triangle->vbo);
     glBindVertexArray(triangle->vao);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle->temp), triangle->temp, GL_STATIC_DRAW);
     glEnableVertexArrayAttrib(triangle->vao, 0);
     glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+float normalize_x(int x)
+{
+    return (x / float(WIDTH) * 2.0f - 1.0f);
+}
+
+float normalize_y(int y)
+{
+    return (1.0f - (y / float(HEIGHT) * 2.0f));
+}
+
+glm::vec2 normalize_xy(int x, int y)
+{
+    return {normalize_x(x), normalize_y(y)};
+}
+
+void enemy_position(Triangle *enemy, Triangle *hero)
+{
+    // basically make the enemy track the hero
 }
