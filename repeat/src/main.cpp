@@ -5,16 +5,29 @@
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <vector>
 
 #define PI 3.14159265358979323846
 #define WIDTH = 800
 #define HEIGHT = 600
 
+struct Triangle
+{
+    GLuint vbo;
+    GLuint vao;
+    glm::vec3 vertices[3];
+    glm::vec3 temp[3];
+    std::vector<Triangle *> *draw_queue;
+};
+
 void render_triangle(SDL_Window *window);
 std::string get_shader_program_string(std::string filepath);
-void rotate_traingle(glm::vec3 triangle[], float angle);
+void rotate_triangle(Triangle *triangle, float angle);
 void move_triangle(glm::vec3 triangle[], std::string dir);
 glm::vec2 compute_center(glm::vec3 triangle[]);
+void load_and_draw(Triangle *triangle);
+
+std::vector<Triangle *> draw_queue;
 
 int main()
 {
@@ -24,14 +37,16 @@ int main()
     {
         std::cerr << "SDL failed to initialize!" << std::endl;
     }
-    // SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-    // SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-    // SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-    // SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
-    // SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 32);
-    // SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 32);
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     window = SDL_CreateWindow("Testing window", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 800, 600, SDL_WINDOW_OPENGL);
-
+    int width, height;
+    SDL_GetWindowSize(window, &width, &height);
+    glViewport(0, 0, width, height);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
 
     GLenum status = glewInit();
@@ -44,6 +59,7 @@ int main()
     {
         std::cerr << "SDL window failed to initialize" << std::endl;
     }
+    // SDL_GL_SetSwapInterval(0); // Disable vsync
 
     render_triangle(window);
 
@@ -75,10 +91,19 @@ std::string get_shader_program_string(std::string filepath)
 
 void render_triangle(SDL_Window *window)
 {
+
     // set up vertices
-    glm::vec3 vertices[] = {(glm::vec3(0, 0, 1)),
-                            (glm::vec3(0.5, 0.75, 1)),
-                            (glm::vec3(1, 0, 1))};
+    glm::vec3 vertices[3] = {(glm::vec3(0, 0, 1)),
+                             (glm::vec3(0.25, 0.375, 1)),
+                             (glm::vec3(0.5, 0, 1))};
+
+    // set up vertices
+    glm::vec3 enemy[3] = {(glm::vec3(0, 0, 1)),
+                          (glm::vec3(0.125, 0.4, 1)),
+                          (glm::vec3(0.25, 0, 1))};
+
+    glm::vec3 temp_triangle[3];
+    int rotation_angle = 0;
     // set up the vertex and fragment shader
     int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -139,24 +164,51 @@ void render_triangle(SDL_Window *window)
     // set up vbo and vao
 
     // vertex buffer object just holds the data
-    GLuint vbo, vao;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    // main triangle
+    Triangle hero_triangle;
+    glGenBuffers(1, &hero_triangle.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, hero_triangle.vbo);
+    hero_triangle.vertices[0] = glm::vec3(0, 0, 1);
+    hero_triangle.vertices[1] = glm::vec3(0.25, 0.375, 1);
+    hero_triangle.vertices[2] = glm::vec3(0.5, 0, 1);
+    hero_triangle.draw_queue = &draw_queue;
+
+    draw_queue.push_back(&hero_triangle);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(hero_triangle.vertices), hero_triangle.vertices, GL_STATIC_DRAW);
+
+    glGenVertexArrays(1, &hero_triangle.vao);
+    glBindVertexArray(hero_triangle.vao);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
-    glEnableVertexArrayAttrib(vao, 0);
+    glEnableVertexArrayAttrib(hero_triangle.vao, 0);
     glUseProgram(shader_program);
+
+    // enemies
+    Triangle enemy_triangle;
+    glGenBuffers(1, &hero_triangle.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, hero_triangle.vbo);
+    enemy_triangle.vertices[0] = glm::vec3(0, 0, 1);
+    enemy_triangle.vertices[1] = glm::vec3(0.25, 0.375, 1);
+    enemy_triangle.vertices[2] = glm::vec3(0.5, 0, 1);
+    enemy_triangle.draw_queue = &draw_queue;
+    draw_queue.push_back(&enemy_triangle);
+
+    glBufferData(GL_ARRAY_BUFFER, sizeof(enemy_triangle.vertices), enemy_triangle.vertices, GL_STATIC_DRAW);
+
+    glGenVertexArrays(1, &enemy_triangle.vao);
+    glBindVertexArray(enemy_triangle.vao);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+    glEnableVertexArrayAttrib(enemy_triangle.vao, 0);
+    glUseProgram(shader_program);
+
     int count = 0;
 
     // handle events
     SDL_Event e;
     while (true)
     {
-        count++;
-        printf("%d\n", count);
+        rotation_angle++;
+        rotation_angle %= 361;
         while (SDL_PollEvent(&e))
         {
             if (e.type == SDL_QUIT)
@@ -169,24 +221,46 @@ void render_triangle(SDL_Window *window)
             {
                 if (e.key.keysym.sym == SDLK_w)
                 {
-                    move_triangle(vertices, "up");
+                    move_triangle(hero_triangle.vertices, "up");
                     printf("up\n");
                 }
                 if (e.key.keysym.sym == SDLK_d)
                 {
-                    move_triangle(vertices, "right");
+                    move_triangle(hero_triangle.vertices, "right");
                     printf("right\n");
                 }
                 if (e.key.keysym.sym == SDLK_a)
                 {
-                    move_triangle(vertices, "left");
+                    move_triangle(hero_triangle.vertices, "left");
                     printf("left\n");
                 }
                 if (e.key.keysym.sym == SDLK_s)
                 {
-                    move_triangle(vertices, "down");
+                    move_triangle(hero_triangle.vertices, "down");
                     printf("down\n");
                 }
+            }
+            else if (e.type == SDL_MOUSEMOTION)
+            {
+                int x, y;
+                SDL_GetMouseState(&x, &y);
+                const int screen_width = 800;
+                const int screen_height = 600;
+
+                // Normalize mouse coordinates to OpenGL's [-1, 1] range
+                float normalized_x = (x / (float)screen_width) * 2.0f - 1.0f;
+                float normalized_y = 1.0f - (y / (float)screen_height) * 2.0f;
+
+                // Compute triangle center in OpenGL coordinates
+                glm::vec2 center = compute_center(hero_triangle.vertices);
+
+                // Calculate the angle between the mouse and the triangle's center
+                float opposite = normalized_y - center.y;
+                float adjacent = normalized_x - center.x;
+                float theta = atan2(opposite, adjacent);
+                theta += glm::radians(30.0f);
+                printf("Theta value %f\n", theta * 180.0 / PI);
+                rotate_triangle(&hero_triangle, theta);
             }
         }
         // vertices[0].x = vertices[0].x * glm::cos(0.0174533) - vertices[0].y * glm::sin(0.0174533);
@@ -197,15 +271,17 @@ void render_triangle(SDL_Window *window)
 
         // vertices[2].x = vertices[2].x * glm::cos(0.0174533) - vertices[2].y * glm::sin(0.0174533);
         // vertices[2].y = vertices[2].x * glm::sin(0.0174533) + vertices[2].y * glm::cos(0.0174533);
-        rotate_traingle(vertices, 1);
-
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        // rotate_triangle(temp_triangle, vertices, rotation_angle);
         // draw
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // glBindVertexArray(vao);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        for (auto &item : draw_queue)
+        {
+            load_and_draw(item);
+        }
 
         SDL_GL_SwapWindow(window);
+        SDL_Delay(10);
     }
 }
 
@@ -245,24 +321,41 @@ glm::vec2 compute_center(glm::vec3 triangle[])
     return centroid;
 }
 
-void rotate_traingle(glm::vec3 triangle[], float angle)
+void rotate_triangle(Triangle *triangle, float angle)
 {
 
-    glm::vec2 centroid = compute_center(triangle);
     for (int i = 0; i < 3; i++)
     {
-        triangle[i].x -= centroid.x;
-        triangle[i].y -= centroid.y;
+        triangle->temp[i].x = triangle->vertices[i].x;
+        triangle->temp[i].y = triangle->vertices[i].y;
+        triangle->temp[i].z = triangle->vertices[i].z;
     }
-    float rad_angle = angle * PI / 180.0f;
+
+    glm::vec2 centroid = compute_center(triangle->temp);
     for (int i = 0; i < 3; i++)
     {
-        triangle[i].x = triangle[i].x * glm::cos(rad_angle) - triangle[i].y * glm::sin(rad_angle);
-        triangle[i].y = triangle[i].x * glm::sin(rad_angle) + triangle[i].y * glm::cos(rad_angle);
+        triangle->temp[i].x -= centroid.x;
+        triangle->temp[i].y -= centroid.y;
     }
     for (int i = 0; i < 3; i++)
     {
-        triangle[i].x += centroid.x;
-        triangle[i].y += centroid.y;
+        float x = triangle->temp[i].x;
+        float y = triangle->temp[i].y;
+        triangle->temp[i].x = x * glm::cos(angle) - y * glm::sin(angle);
+        triangle->temp[i].y = x * glm::sin(angle) + y * glm::cos(angle);
     }
+    for (int i = 0; i < 3; i++)
+    {
+        triangle->temp[i].x += centroid.x;
+        triangle->temp[i].y += centroid.y;
+    }
+}
+
+void load_and_draw(Triangle *triangle)
+{
+    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle->temp), triangle->temp, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, triangle->vbo);
+    glBindVertexArray(triangle->vao);
+    glEnableVertexArrayAttrib(triangle->vao, 0);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
 }
