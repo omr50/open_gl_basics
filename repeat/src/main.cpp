@@ -29,6 +29,7 @@ struct Triangle
 
 void render_triangle(SDL_Window *window);
 std::string get_shader_program_string(std::string filepath);
+int create_shader_program_from_vs_fs(std::string vs_path, std::string fs_path);
 void rotate_triangle_to_point(Triangle *triangle, float x, float y, float offset);
 void move_triangle(Triangle *triangle, std::string dir);
 glm::vec2 compute_center(glm::vec3 triangle[]);
@@ -129,116 +130,8 @@ void render_triangle(SDL_Window *window)
     int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
 
-    std::string vertex_shader_program_string = get_shader_program_string("basicShader.vs");
-    std::string fragment_shader_program_string = get_shader_program_string("basicShader.fs");
-    const GLchar *vertex_shader_program_glstr = vertex_shader_program_string.c_str();
-    const GLchar *fragment_shader_program_glstr = fragment_shader_program_string.c_str();
-
-    GLint vertex_shader_length = vertex_shader_program_string.size();
-    GLint fragment_shader_length = fragment_shader_program_string.size();
-    glShaderSource(vertex_shader, 1, &vertex_shader_program_glstr, &vertex_shader_length);
-    glShaderSource(fragment_shader, 1, &fragment_shader_program_glstr, &fragment_shader_length);
-
-    // compile them, attach them to program and link shader program
-    glCompileShader(vertex_shader);
-    glCompileShader(fragment_shader);
-
-    int success = 0;
-    int length;
-    GLchar errbuff[1024];
-    std::string error;
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
-
-    if (success == GL_FALSE)
-    {
-        glGetShaderInfoLog(vertex_shader, sizeof(errbuff), &length, errbuff);
-        std::cerr << "Error compiling shaders: " << errbuff << std::endl;
-    }
-
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
-
-    if (success == GL_FALSE)
-    {
-        glGetShaderInfoLog(fragment_shader, sizeof(errbuff), &length, errbuff);
-        std::cerr << "Error compiling shaders: " << errbuff << std::endl;
-    }
-
-    int shader_program = glCreateProgram();
-
-    glAttachShader(shader_program, vertex_shader);
-    glAttachShader(shader_program, fragment_shader);
-
-    glBindAttribLocation(shader_program, 0, "position");
-
-    glLinkProgram(shader_program);
-
-    glValidateProgram(shader_program);
-    glGetProgramiv(shader_program, GL_VALIDATE_STATUS, &success);
-    if (success == GL_FALSE)
-    {
-        glGetProgramInfoLog(shader_program, sizeof(errbuff), &length, errbuff);
-        std::cerr << "Invalid Program: " << errbuff << std::endl;
-    }
-    glDeleteShader(vertex_shader);
-    glDeleteShader(fragment_shader);
-
-    int vertex_shader2 = glCreateShader(GL_VERTEX_SHADER);
-    int fragment_shader2 = glCreateShader(GL_FRAGMENT_SHADER);
-
-    std::string vertex_shader_program_string2 = get_shader_program_string("basicShader2.vs");
-    std::string fragment_shader_program_string2 = get_shader_program_string("basicShader2.fs");
-    const GLchar *vertex_shader_program_glstr2 = vertex_shader_program_string2.c_str();
-    const GLchar *fragment_shader_program_glstr2 = fragment_shader_program_string2.c_str();
-
-    GLint vertex_shader_length2 = vertex_shader_program_string2.size();
-    GLint fragment_shader_length2 = fragment_shader_program_string2.size();
-    glShaderSource(vertex_shader2, 1, &vertex_shader_program_glstr2, &vertex_shader_length2);
-    glShaderSource(fragment_shader2, 1, &fragment_shader_program_glstr2, &fragment_shader_length2);
-
-    // compile them, attach them to program and link shader program
-    glCompileShader(vertex_shader2);
-    glCompileShader(fragment_shader2);
-
-    int success2 = 0;
-    int length2;
-    GLchar errbuff2[1024];
-    std::string error2;
-    glGetShaderiv(vertex_shader2, GL_COMPILE_STATUS, &success2);
-
-    if (success2 == GL_FALSE)
-    {
-        glGetShaderInfoLog(vertex_shader2, sizeof(errbuff2), &length2, errbuff2);
-        std::cerr << "Error compiling shaders: " << errbuff2 << std::endl;
-    }
-
-    glGetShaderiv(vertex_shader2, GL_COMPILE_STATUS, &success2);
-
-    if (success2 == GL_FALSE)
-    {
-        glGetShaderInfoLog(fragment_shader2, sizeof(errbuff2), &length2, errbuff2);
-        std::cerr << "Error compiling shaders: " << errbuff2 << std::endl;
-    }
-
-    int shader_program2 = glCreateProgram();
-
-    glAttachShader(shader_program2, vertex_shader2);
-    glAttachShader(shader_program2, fragment_shader2);
-
-    glBindAttribLocation(shader_program2, 0, "aPos");
-    glBindAttribLocation(shader_program2, 1, "aColor");
-
-    glLinkProgram(shader_program2);
-
-    glValidateProgram(shader_program2);
-    glGetProgramiv(shader_program2, GL_VALIDATE_STATUS, &success2);
-    if (success2 == GL_FALSE)
-    {
-        glGetProgramInfoLog(shader_program2, sizeof(errbuff2), &length2, errbuff2);
-        std::cerr << "Invalid Program: " << errbuff2 << std::endl;
-    }
-    glDeleteShader(vertex_shader2);
-    glDeleteShader(fragment_shader2);
-
+    int shader_program = create_shader_program_from_vs_fs("basicShader.vs", "basicShader.fs");
+    int shader_program2 = create_shader_program_from_vs_fs("basicShader2.vs", "basicShader2.fs");
     // set up vbo and vao
 
     // vertex buffer object just holds the data
@@ -587,4 +480,66 @@ void draw_all(Triangle *hero, std::vector<Triangle *> *enemies, GLuint vao)
 
     draw_hero(hero);
     draw_enemies(enemies, hero, vao);
+}
+
+int create_shader_program_from_vs_fs(std::string vs_path, std::string fs_path)
+{
+    int vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    int fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+
+    std::string vertex_shader_program_string = get_shader_program_string(vs_path);
+    std::string fragment_shader_program_string = get_shader_program_string(fs_path);
+    const GLchar *vertex_shader_program_glstr = vertex_shader_program_string.c_str();
+    const GLchar *fragment_shader_program_glstr = fragment_shader_program_string.c_str();
+
+    GLint vertex_shader_length = vertex_shader_program_string.size();
+    GLint fragment_shader_length = fragment_shader_program_string.size();
+    glShaderSource(vertex_shader, 1, &vertex_shader_program_glstr, &vertex_shader_length);
+    glShaderSource(fragment_shader, 1, &fragment_shader_program_glstr, &fragment_shader_length);
+
+    // compile them, attach them to program and link shader program
+    glCompileShader(vertex_shader);
+    glCompileShader(fragment_shader);
+
+    int success = 0;
+    int length;
+    GLchar errbuff[1024];
+    std::string error;
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+
+    if (success == GL_FALSE)
+    {
+        glGetShaderInfoLog(vertex_shader, sizeof(errbuff), &length, errbuff);
+        std::cerr << "Error compiling shaders: " << errbuff << std::endl;
+    }
+
+    // ERROR, SHOULD BE FRAGMENT SHADER IN HERE
+    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success);
+
+    if (success == GL_FALSE)
+    {
+        glGetShaderInfoLog(fragment_shader, sizeof(errbuff), &length, errbuff);
+        std::cerr << "Error compiling shaders: " << errbuff << std::endl;
+    }
+
+    int shader_program = glCreateProgram();
+
+    glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+
+    glBindAttribLocation(shader_program, 0, "position");
+
+    glLinkProgram(shader_program);
+
+    glValidateProgram(shader_program);
+    glGetProgramiv(shader_program, GL_VALIDATE_STATUS, &success);
+    if (success == GL_FALSE)
+    {
+        glGetProgramInfoLog(shader_program, sizeof(errbuff), &length, errbuff);
+        std::cerr << "Invalid Program: " << errbuff << std::endl;
+    }
+    glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+
+    return shader_program;
 }

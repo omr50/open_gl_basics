@@ -3,6 +3,9 @@
         "vector": "cpp",
         "algorithm": "cpp",
         "iostream": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "*.tcc": "cpp",
+        "istream": "cpp",
+        "streambuf": "cpp"
     }
 }
