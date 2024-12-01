@@ -13,6 +13,7 @@ struct Cube
     GLfloat *temp_vertices;
     GLuint vbo;
     GLuint vao;
+    GLuint ebo;
 };
 
 void init_window(int width, int height);
@@ -23,21 +24,22 @@ void mainloop();
 void window_events();
 
 GLfloat *create_cube_vertices(glm::vec3 start_coord, float side_len);
-void set_cube_vao_vbo(Cube *cube);
+void set_cube_vao_vbo(Cube *cube, GLuint indices[]);
 Cube *create_cube(glm::vec3 start_coord, float side_len);
 void update_cube_vertex_buffer(Cube *cube);
 void draw_cube(Cube *cube);
+const char *GetGLErrorString(GLenum error);
 
 SDL_Window *window = nullptr;
+Cube *cube;
 
 int main()
 {
 
     init_window(800, 600);
-    GLenum status = glewInit();
     // render loop
     glm::vec3 start_coords = {1.0, 1.0, 1.0};
-    Cube *cube = create_cube(start_coords, 2);
+    cube = create_cube(start_coords, 2);
     mainloop();
 }
 
@@ -55,6 +57,23 @@ void init_window(int width, int height)
     SDL_GetWindowSize(window, &width, &height);
     glViewport(0, 0, width, height);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
+    // Enable depth testing
+    // glEnable(GL_DEPTH_TEST);
+
+    if (!gl_context)
+    {
+        std::cerr << "Failed to create OpenGL context: " << SDL_GetError() << std::endl;
+        SDL_Quit();
+        exit(1);
+    }
+
+    GLenum status = glewInit();
+    // Now it's safe to make OpenGL calls
+    SDL_GetWindowSize(window, &width, &height);
+    glViewport(0, 0, width, height);
+
+    // Enable depth testing
+    glEnable(GL_DEPTH_TEST);
 }
 
 GLfloat *create_cube_vertices(glm::vec3 start_coord, float side_len)
@@ -116,7 +135,7 @@ GLuint create_shader(std::string filename, GLenum type)
         glGetShaderInfoLog(shader, sizeof(errbuff), &length, errbuff);
         std::cerr << "Error compiling shaders: " << errbuff << std::endl;
     }
-
+    printf("created shader\n");
     return shader;
 }
 GLuint create_shader_program(std::string vertex_shader_filename, std::string fragment_shader_filename)
@@ -145,15 +164,22 @@ GLuint create_shader_program(std::string vertex_shader_filename, std::string fra
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
+    printf("created shader program\n");
     return shader_program;
 }
 
 void mainloop()
 {
+    int shader_program = create_shader_program("basicShader.vs", "basicShader.fs");
+    glUseProgram(shader_program);
     while (true)
     {
         window_events();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        printf("cleared screen\n");
+        draw_cube(cube);
+        printf("Drew Cube\n");
         SDL_Delay(1);
     }
     SDL_DestroyWindow(window);
@@ -180,17 +206,29 @@ void window_events()
     }
 }
 
-void set_cube_vao_vbo(Cube *cube)
+void set_cube_vao_vbo(Cube *cube, GLuint indices[])
 {
-    glGenBuffers(1, &cube->vbo);
-
-    glBindBuffer(GL_VERTEX_ARRAY, cube->vbo);
-    glCreateVertexArrays(1, &cube->vao);
-
+    glGenVertexArrays(1, &cube->vao);
     glBindVertexArray(cube->vao);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)NULL);
-    glEnableVertexArrayAttrib(cube->vao, 0);
+
+    // Generate and bind the VBO
+    glGenBuffers(1, &cube->vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, cube->vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube->temp_vertices, GL_STATIC_DRAW);
+
+    // Set up vertex attributes
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+    glEnableVertexAttribArray(0);
+
+    // Generate and bind the EBO
+    glGenBuffers(1, &cube->ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube->ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 36, indices, GL_STATIC_DRAW);
+
+    // Unbind VAO to prevent unintended modifications
+    glBindVertexArray(0);
 }
+
 Cube *create_cube(glm::vec3 start_coord, float side_len)
 {
     Cube *cube = (Cube *)malloc(sizeof(Cube));
@@ -202,20 +240,88 @@ Cube *create_cube(glm::vec3 start_coord, float side_len)
         cube->temp_vertices[i] = cube->original_vertices[i];
     }
 
-    set_cube_vao_vbo(cube);
+    GLuint cube_indices[] = {
+        // Front face
+        0, 1, 4,
+        1, 4, 5,
+
+        // Back face
+        2, 3, 7,
+        3, 6, 7,
+
+        // Left face
+        0, 2, 4,
+        2, 4, 6,
+
+        // Right face
+        1, 3, 5,
+        3, 5, 7,
+
+        // Top face
+        4, 5, 6,
+        5, 6, 7,
+
+        // Bottom face
+        0, 1, 2,
+        1, 2, 3};
+
+    set_cube_vao_vbo(cube, cube_indices);
 
     return cube;
 }
 
 void update_cube_vertex_buffer(Cube *cube)
 {
+    glBindBuffer(GL_ARRAY_BUFFER, cube->vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube->temp_vertices, GL_STATIC_DRAW);
 }
 
 void draw_cube(Cube *cube)
 {
+    printf("1?\n");
+    glBindVertexArray(cube->vao);
     update_cube_vertex_buffer(cube);
-    glDrawArrays(GL_TRIANGLES, 0, 24);
+    glBindBuffer(GL_ARRAY_BUFFER, cube->vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube->ebo);
+    glBindVertexArray(cube->vao);
+    printf("2?\n");
+    // glDrawArrays(GL_TRIANGLES, 0, 24);
+    try
+    {
+
+        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+    }
+    catch (std::exception e)
+    {
+        GLenum err = glGetError();
+        if (err != GL_NO_ERROR)
+        {
+            std::cerr << "OpenGL error: " << GetGLErrorString(err) << std::endl;
+        }
+    }
+    printf("3?\n");
+}
+
+const char *GetGLErrorString(GLenum error)
+{
+    switch (error)
+    {
+    case GL_NO_ERROR:
+        return "No error has been recorded.";
+    case GL_INVALID_ENUM:
+        return "An invalid enum value was passed.";
+    case GL_INVALID_VALUE:
+        return "An invalid value was passed.";
+    case GL_INVALID_OPERATION:
+        return "The requested operation is not valid.";
+    case GL_INVALID_FRAMEBUFFER_OPERATION:
+        return "The framebuffer object is not complete.";
+    case GL_OUT_OF_MEMORY:
+        return "There is not enough memory left to execute the command.";
+    // Add more cases if needed
+    default:
+        return "An unknown OpenGL error has occurred.";
+    }
 }
 
 // rotate_x_axis()
