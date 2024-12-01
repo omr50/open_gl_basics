@@ -182,6 +182,63 @@ void render_triangle(SDL_Window *window)
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
+    int vertex_shader2 = glCreateShader(GL_VERTEX_SHADER);
+    int fragment_shader2 = glCreateShader(GL_FRAGMENT_SHADER);
+
+    std::string vertex_shader_program_string2 = get_shader_program_string("basicShader2.vs");
+    std::string fragment_shader_program_string2 = get_shader_program_string("basicShader2.fs");
+    const GLchar *vertex_shader_program_glstr2 = vertex_shader_program_string2.c_str();
+    const GLchar *fragment_shader_program_glstr2 = fragment_shader_program_string2.c_str();
+
+    GLint vertex_shader_length2 = vertex_shader_program_string2.size();
+    GLint fragment_shader_length2 = fragment_shader_program_string2.size();
+    glShaderSource(vertex_shader2, 1, &vertex_shader_program_glstr2, &vertex_shader_length2);
+    glShaderSource(fragment_shader2, 1, &fragment_shader_program_glstr2, &fragment_shader_length2);
+
+    // compile them, attach them to program and link shader program
+    glCompileShader(vertex_shader2);
+    glCompileShader(fragment_shader2);
+
+    int success2 = 0;
+    int length2;
+    GLchar errbuff2[1024];
+    std::string error2;
+    glGetShaderiv(vertex_shader2, GL_COMPILE_STATUS, &success2);
+
+    if (success2 == GL_FALSE)
+    {
+        glGetShaderInfoLog(vertex_shader2, sizeof(errbuff2), &length2, errbuff2);
+        std::cerr << "Error compiling shaders: " << errbuff2 << std::endl;
+    }
+
+    glGetShaderiv(vertex_shader2, GL_COMPILE_STATUS, &success2);
+
+    if (success2 == GL_FALSE)
+    {
+        glGetShaderInfoLog(fragment_shader2, sizeof(errbuff2), &length2, errbuff2);
+        std::cerr << "Error compiling shaders: " << errbuff2 << std::endl;
+    }
+
+    int shader_program2 = glCreateProgram();
+
+    glAttachShader(shader_program2, vertex_shader2);
+    glAttachShader(shader_program2, fragment_shader2);
+
+    glBindAttribLocation(shader_program2, 0, "aPos");
+    glBindAttribLocation(shader_program2, 1, "aColor");
+
+    glLinkProgram(shader_program2);
+
+    glValidateProgram(shader_program2);
+    glGetProgramiv(shader_program2, GL_VALIDATE_STATUS, &success2);
+    if (success2 == GL_FALSE)
+    {
+        glGetProgramInfoLog(shader_program2, sizeof(errbuff2), &length2, errbuff2);
+        std::cerr << "Invalid Program: " << errbuff2 << std::endl;
+    }
+    glDeleteShader(vertex_shader2);
+    glDeleteShader(fragment_shader2);
+
     // set up vbo and vao
 
     // vertex buffer object just holds the data
@@ -220,7 +277,24 @@ void render_triangle(SDL_Window *window)
         draw_queue.push_back(create_enemy(enemy_vao));
     }
 
-    glUseProgram(shader_program);
+    float test_vertices[] = {
+        // positions         // colors
+        0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,  // bottom right
+        -0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f, // bottom left
+        0.0f, 0.5f, 0.0f, 0.0f, 0.0f, 1.0f    // top
+    };
+    GLuint test_vbo, test_vao;
+    glGenBuffers(1, &test_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, test_vbo);
+    glCreateVertexArrays(1, &test_vao);
+    glBindVertexArray(test_vao);
+    // position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
+    // color attribute
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    // glBindBuffer(GL_ARRAY_BUFFER, test_vbo);
 
     int count = 0;
 
@@ -272,8 +346,17 @@ void render_triangle(SDL_Window *window)
         float greenValue = sin(rotation_angle / 360.0) / 2.0f + 0.5f;
         printf("Green val %f\n", greenValue);
         int vertexColorLocation = glGetUniformLocation(shader_program, "ourColor");
+        glUseProgram(shader_program);
         glUniform4f(vertexColorLocation, 1.0f, greenValue, 0.0f, 1.0f);
         draw_all(&hero_triangle, &draw_queue, enemy_vao);
+
+        glUseProgram(shader_program2);
+        // buffer the data
+        glBindVertexArray(test_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, test_vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(test_vertices), test_vertices, GL_STATIC_DRAW);
+
+        glDrawArrays(GL_TRIANGLES, 0, 3);
 
         SDL_GL_SwapWindow(window);
         SDL_Delay(10);
