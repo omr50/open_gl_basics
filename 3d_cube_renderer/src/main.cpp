@@ -39,7 +39,7 @@ int main()
     init_window(800, 600);
     // render loop
     glm::vec3 start_coords = {1.0, 1.0, 1.0};
-    cube = create_cube(start_coords, 2);
+    cube = create_cube(start_coords, 1);
     mainloop();
 }
 
@@ -66,8 +66,16 @@ void init_window(int width, int height)
         SDL_Quit();
         exit(1);
     }
-
+    // Initialize GLEW
+    glewExperimental = GL_TRUE;
     GLenum status = glewInit();
+    if (status != GLEW_OK)
+    {
+        std::cerr << "GLEW Initialization Error: " << glewGetErrorString(status) << std::endl;
+        SDL_Quit();
+        exit(1);
+    }
+    // GLenum status = glewInit();
     // Now it's safe to make OpenGL calls
     SDL_GetWindowSize(window, &width, &height);
     glViewport(0, 0, width, height);
@@ -118,26 +126,28 @@ GLuint create_shader(std::string filename, GLenum type)
 {
     std::string shader_string = read_shader_file(filename);
     const GLchar *shader_const_string = shader_string.c_str();
-    GLint shader_source_length = shader_string.length();
 
     GLuint shader = glCreateShader(type);
-    glShaderSource(shader, 1, &shader_const_string, &shader_source_length);
+    glShaderSource(shader, 1, &shader_const_string, NULL);
     glCompileShader(shader);
 
-    int success = 0;
-    int length;
-    GLchar errbuff[1024];
-    std::string error;
+    // Check for compilation errors
+    GLint success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-
-    if (success == GL_FALSE)
+    if (!success)
     {
-        glGetShaderInfoLog(shader, sizeof(errbuff), &length, errbuff);
-        std::cerr << "Error compiling shaders: " << errbuff << std::endl;
+        GLchar infoLog[512];
+        glGetShaderInfoLog(shader, 512, NULL, infoLog);
+        std::cerr << "Error compiling shader (" << filename << "): " << infoLog << std::endl;
     }
-    printf("created shader\n");
+    else
+    {
+        std::cout << "Shader compiled successfully: " << filename << std::endl;
+    }
+
     return shader;
 }
+
 GLuint create_shader_program(std::string vertex_shader_filename, std::string fragment_shader_filename)
 {
     GLuint vertex_shader = create_shader(vertex_shader_filename, GL_VERTEX_SHADER);
@@ -147,24 +157,27 @@ GLuint create_shader_program(std::string vertex_shader_filename, std::string fra
     glAttachShader(shader_program, vertex_shader);
     glAttachShader(shader_program, fragment_shader);
 
-    glBindAttribLocation(shader_program, 0, "position");
+    // Link the program
     glLinkProgram(shader_program);
-    glValidateProgram(shader_program);
 
-    int success = 0;
-    int length;
-    GLchar errbuff[1024];
-
-    glGetProgramiv(shader_program, GL_VALIDATE_STATUS, &success);
-    if (success == GL_FALSE)
+    // Check for linking errors
+    GLint success;
+    glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
+    if (!success)
     {
-        glGetProgramInfoLog(shader_program, sizeof(errbuff), &length, errbuff);
-        std::cerr << "Invalid Program: " << errbuff << std::endl;
+        GLchar infoLog[512];
+        glGetProgramInfoLog(shader_program, 512, NULL, infoLog);
+        std::cerr << "Error linking shader program: " << infoLog << std::endl;
     }
+    else
+    {
+        std::cout << "Shader program linked successfully." << std::endl;
+    }
+
+    // Clean up shaders (they're linked into the program now and no longer necessary)
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
-    printf("created shader program\n");
     return shader_program;
 }
 
@@ -299,6 +312,7 @@ void draw_cube(Cube *cube)
             std::cerr << "OpenGL error: " << GetGLErrorString(err) << std::endl;
         }
     }
+    SDL_GL_SwapWindow(window);
     printf("3?\n");
 }
 
