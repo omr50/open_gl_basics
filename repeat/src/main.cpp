@@ -268,6 +268,11 @@ void render_triangle(SDL_Window *window)
         // draw
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // glBindVertexArray(vao);
+        // float r = PI * static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+        float greenValue = sin(rotation_angle / 360.0) / 2.0f + 0.5f;
+        printf("Green val %f\n", greenValue);
+        int vertexColorLocation = glGetUniformLocation(shader_program, "ourColor");
+        glUniform4f(vertexColorLocation, 1.0f, greenValue, 0.0f, 1.0f);
         draw_all(&hero_triangle, &draw_queue, enemy_vao);
 
         SDL_GL_SwapWindow(window);
