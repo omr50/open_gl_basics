@@ -48,6 +48,11 @@ float translate_x = 0;
 float translate_y = 0;
 float translate_z = 0;
 
+float yaw = 0;
+float pitch = 0;
+bool mouse_mode = false;
+bool software_mouse_Event = false;
+
 GLuint cube_line_indices[] = {
     // Front face
     0, 1, 1, 5, 5, 4, 4, 0,
@@ -230,7 +235,6 @@ void mainloop()
         window_events();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        printf("cleared screen\n");
         // get_x_rotation_matrix(rotation_x, angle);
         // get_y_rotation_matrix(rotation_y, angle);
         // get_z_rotation_matrix(rotation_z, angle);
@@ -241,11 +245,10 @@ void mainloop()
         // glUniformMatrix3fv(matrix_y, 1, GL_FALSE, rotation_y);
         // glUniformMatrix3fv(matrix_z, 1, GL_FALSE, rotation_z);
         GLuint mvp_matrix = glGetUniformLocation(shader_program, "mvp_matrix");
-        set_mvp_matrix(mvp_matrix, {translate_x, translate_y, translate_z}, {angle, 0});
+        set_mvp_matrix(mvp_matrix, {translate_x, translate_y, translate_z}, {pitch / 180 * 3.1415, yaw / 180 * 3.1415});
         angle += ((3.1415 / 180));
         glUseProgram(shader_program);
         draw_cube(cube);
-        printf("Drew Cube\n");
         SDL_Delay(1);
     }
     SDL_DestroyWindow(window);
@@ -263,27 +266,35 @@ void window_events()
         {
             if (e.key.keysym.sym == SDLK_w)
             {
-                translate_z += 0.01;
+                translate_z += 0.04;
             }
             if (e.key.keysym.sym == SDLK_d)
             {
-                translate_x -= 0.01;
+                translate_x -= 0.04;
             }
             if (e.key.keysym.sym == SDLK_a)
             {
-                translate_x += 0.01;
+                translate_x += 0.04;
             }
             if (e.key.keysym.sym == SDLK_s)
             {
-                translate_z -= 0.01;
+                translate_z -= 0.04;
             }
             if (e.key.keysym.sym == SDLK_SPACE)
             {
-                translate_y -= 0.01;
+                translate_y -= 0.04;
             }
             if (e.key.keysym.sym == SDLK_LSHIFT)
             {
-                translate_y += 0.01;
+                translate_y += 0.04;
+            }
+            if (e.key.keysym.sym == SDLK_x)
+            {
+                mouse_mode = true;
+            }
+            if (e.key.keysym.sym == SDLK_ESCAPE)
+            {
+                mouse_mode = false;
             }
         }
         if (e.type == SDL_WINDOWEVENT)
@@ -294,6 +305,37 @@ void window_events()
                 SDL_DestroyWindow(window);
                 SDL_Quit();
                 exit(0);
+            }
+        }
+
+        else if (e.type == SDL_MOUSEMOTION)
+        {
+            if (software_mouse_Event)
+            {
+                software_mouse_Event = false;
+                break;
+            }
+            int x, y;
+            SDL_GetMouseState(&x, &y);
+            printf("xy (%d, %d)\n", x, y);
+            // Screen center coordinates
+            int screenCenterX = 800 / 2;
+            int screenCenterY = 600 / 2;
+
+            // Mouse deltas
+            float deltaX = x - screenCenterX;
+            float deltaY = y - screenCenterY;
+
+            // Update camera angles based on mouse movement
+            yaw += deltaX * 0.15;
+            pitch += deltaY * 0.15;
+            pitch = glm::clamp(pitch, -89.0f, 89.0f);
+            yaw = glm::clamp(yaw, -180.0f, 180.0f);
+            printf("(%d, %d)\n", pitch, yaw);
+            if (mouse_mode)
+            {
+                software_mouse_Event = true;
+                SDL_WarpMouseInWindow(window, screenCenterX, screenCenterY);
             }
         }
     }
@@ -374,13 +416,11 @@ void update_cube_vertex_buffer(Cube *cube)
 
 void draw_cube(Cube *cube)
 {
-    printf("1?\n");
     glBindVertexArray(cube->vao);
     update_cube_vertex_buffer(cube);
     glBindBuffer(GL_ARRAY_BUFFER, cube->vbo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube->ebo);
     glBindVertexArray(cube->vao);
-    printf("2?\n");
     // glDrawArrays(GL_TRIANGLES, 0, 24);
     try
     {
@@ -397,7 +437,6 @@ void draw_cube(Cube *cube)
         }
     }
     SDL_GL_SwapWindow(window);
-    printf("3?\n");
 }
 
 const char *GetGLErrorString(GLenum error)
@@ -466,14 +505,20 @@ void get_z_rotation_matrix(GLfloat *matrix, float angle)
 
 void set_mvp_matrix(GLuint LocationMVP, glm::vec3 Translate, glm::vec2 const &Rotate)
 {
+
     glm::mat4 Projection = glm::perspective(45.0f, 4.0f / 3.0f, 0.1f, 100.f);
-    glm::mat4 ViewTranslate = glm::translate(glm::mat4(1.0f), glm::vec3(Translate.x, Translate.y, Translate.z));
-    glm::mat4 ViewRotateX = glm::rotate(ViewTranslate, Rotate.y, glm::vec3(-1.0f, 0.0f, 0.0f));
-    glm::mat4 View = glm::rotate(ViewRotateX, Rotate.x, glm::vec3(0.0f, 1.0f, 0.0f));
+    // glm::mat4 ViewRotateX = glm::rotate(glm::mat4(1.0f), Rotate.x, glm::vec3(1.0f, 0.0f, 0.0f));
+    // glm::mat4 ViewRotateY = glm::rotate(ViewRotateX, Rotate.y, glm::vec3(0.0f, 1.0f, 0.0f));
+    // glm::mat4 ViewTranslate = glm::translate(ViewRotateY, Translate); // Negate translation
+
+    glm::mat4 ViewRotateX = glm::rotate(glm::mat4(1.0f), Rotate.x, glm::vec3(1.0f, 0.0f, 0.0f));
+    glm::mat4 ViewRotateY = glm::rotate(ViewRotateX, Rotate.y, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 ViewTranslate = glm::translate(ViewRotateY, glm::vec3(Translate.x, Translate.y, Translate.z));
     glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
-    glm::mat4 MVP = Projection * View * Model;
+    glm::mat4 MVP = Projection * ViewRotateY * Model;
     glUniformMatrix4fv(LocationMVP, 1, GL_FALSE, glm::value_ptr(MVP));
 }
+
 // rotate_x_axis()
 // rotate_y_axis()
 // rotate_z_axis()
