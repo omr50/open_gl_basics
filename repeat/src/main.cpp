@@ -165,7 +165,7 @@ void render_triangle(SDL_Window *window)
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
     glEnableVertexArrayAttrib(enemy_vao, 0);
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 1; i++)
     {
         draw_queue.push_back(create_enemy(enemy_vao));
     }

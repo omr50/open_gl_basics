@@ -3,6 +3,8 @@
 #include <SDL2/SDL.h>
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -29,17 +31,40 @@ Cube *create_cube(glm::vec3 start_coord, float side_len);
 void update_cube_vertex_buffer(Cube *cube);
 void draw_cube(Cube *cube);
 const char *GetGLErrorString(GLenum error);
+void get_x_rotation_matrix(GLfloat *matrix, float angle);
+void get_y_rotation_matrix(GLfloat *matrix, float angle);
+void get_z_rotation_matrix(GLfloat *matrix, float angle);
+void set_mvp_matrix(GLuint LocationMVP, glm::vec3 Translate, glm::vec2 const &Rotate);
 
 SDL_Window *window = nullptr;
 Cube *cube;
+float apply_x = 0, apply_y = 0, apply_z = 0;
+
+GLfloat rotation_x[9];
+GLfloat rotation_y[9];
+GLfloat rotation_z[9];
+GLdouble angle = 0;
+float translate_x = 0;
+float translate_y = 0;
+float translate_z = 0;
+
+GLuint cube_line_indices[] = {
+    // Front face
+    0, 1, 1, 5, 5, 4, 4, 0,
+
+    // Back face
+    2, 3, 3, 7, 7, 6, 6, 2,
+
+    // Connecting edges
+    0, 2, 1, 3, 4, 6, 5, 7};
 
 int main()
 {
 
     init_window(800, 600);
     // render loop
-    glm::vec3 start_coords = {1.0, 1.0, 1.0};
-    cube = create_cube(start_coords, 1);
+    glm::vec3 start_coords = {0.1, 0.1, 0.1};
+    cube = create_cube(start_coords, 0.5);
     mainloop();
 }
 
@@ -178,6 +203,21 @@ GLuint create_shader_program(std::string vertex_shader_filename, std::string fra
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
 
+    // get_x_rotation_matrix(rotation_x, angle);
+    // GLuint matrix_x = glGetUniformLocation(shader_program, "rotation_x");
+    // GLuint matrix_y = glGetUniformLocation(shader_program, "rotation_y");
+    // GLuint matrix_z = glGetUniformLocation(shader_program, "rotation_z");
+    // glUniformMatrix3fv(matrix_x, 1, GL_FALSE, rotation_x);
+    // glUniformMatrix3fv(matrix_y, 1, GL_FALSE, rotation_y);
+    // glUniformMatrix3fv(matrix_z, 1, GL_FALSE, rotation_z);
+    GLuint matrix_y = glGetUniformLocation(shader_program, "mvp_matrix");
+    // angle += ((3.1415 / 180));
+    // if (angle > 1)
+    // {
+
+    //     angle = 0;
+    // }
+
     return shader_program;
 }
 
@@ -191,6 +231,19 @@ void mainloop()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         printf("cleared screen\n");
+        // get_x_rotation_matrix(rotation_x, angle);
+        // get_y_rotation_matrix(rotation_y, angle);
+        // get_z_rotation_matrix(rotation_z, angle);
+        // GLuint matrix_x = glGetUniformLocation(shader_program, "rotation_x");
+        // GLuint matrix_y = glGetUniformLocation(shader_program, "rotation_y");
+        // GLuint matrix_z = glGetUniformLocation(shader_program, "rotation_z");
+        // glUniformMatrix3fv(matrix_x, 1, GL_FALSE, rotation_x);
+        // glUniformMatrix3fv(matrix_y, 1, GL_FALSE, rotation_y);
+        // glUniformMatrix3fv(matrix_z, 1, GL_FALSE, rotation_z);
+        GLuint mvp_matrix = glGetUniformLocation(shader_program, "mvp_matrix");
+        set_mvp_matrix(mvp_matrix, {translate_x, translate_y, translate_z}, {angle, 0});
+        angle += ((3.1415 / 180));
+        glUseProgram(shader_program);
         draw_cube(cube);
         printf("Drew Cube\n");
         SDL_Delay(1);
@@ -206,6 +259,33 @@ void window_events()
 
     while (SDL_PollEvent(&e))
     {
+        if (e.type == SDL_KEYDOWN)
+        {
+            if (e.key.keysym.sym == SDLK_w)
+            {
+                translate_z += 0.01;
+            }
+            if (e.key.keysym.sym == SDLK_d)
+            {
+                translate_x -= 0.01;
+            }
+            if (e.key.keysym.sym == SDLK_a)
+            {
+                translate_x += 0.01;
+            }
+            if (e.key.keysym.sym == SDLK_s)
+            {
+                translate_z -= 0.01;
+            }
+            if (e.key.keysym.sym == SDLK_SPACE)
+            {
+                translate_y -= 0.01;
+            }
+            if (e.key.keysym.sym == SDLK_LSHIFT)
+            {
+                translate_y += 0.01;
+            }
+        }
         if (e.type == SDL_WINDOWEVENT)
         {
             if (e.window.event == SDL_WINDOWEVENT_CLOSE)
@@ -235,8 +315,11 @@ void set_cube_vao_vbo(Cube *cube, GLuint indices[])
 
     // Generate and bind the EBO
     glGenBuffers(1, &cube->ebo);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube->ebo);
+    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 36, indices, GL_STATIC_DRAW);
+
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube->ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 36, indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 24, cube_line_indices, GL_STATIC_DRAW);
 
     // Unbind VAO to prevent unintended modifications
     glBindVertexArray(0);
@@ -302,7 +385,8 @@ void draw_cube(Cube *cube)
     try
     {
 
-        glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        // glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);
     }
     catch (std::exception e)
     {
@@ -338,6 +422,58 @@ const char *GetGLErrorString(GLenum error)
     }
 }
 
+void get_x_rotation_matrix(GLfloat *matrix, float angle)
+{
+
+    matrix[0] = 1;
+    matrix[1] = 0;
+    matrix[2] = 0;
+    matrix[3] = 0;
+    matrix[4] = cos(angle);
+    matrix[5] = -sin(angle);
+    matrix[6] = 0;
+    matrix[7] = sin(angle);
+    matrix[8] = cos(angle);
+}
+
+void get_y_rotation_matrix(GLfloat *matrix, float angle)
+{
+
+    matrix[0] = cos(angle);
+    matrix[1] = 0;
+    matrix[2] = sin(angle);
+    matrix[3] = 0;
+    matrix[4] = 1;
+    matrix[5] = 0;
+    matrix[6] = -sin(angle);
+    matrix[7] = 0;
+    matrix[8] = cos(angle);
+}
+
+void get_z_rotation_matrix(GLfloat *matrix, float angle)
+{
+
+    matrix[0] = cos(angle);
+    matrix[1] = -sin(angle);
+    matrix[2] = 0;
+    matrix[3] = sin(angle);
+    matrix[4] = cos(angle);
+    matrix[5] = 0;
+    matrix[6] = 0;
+    matrix[7] = 0;
+    matrix[8] = 1;
+}
+
+void set_mvp_matrix(GLuint LocationMVP, glm::vec3 Translate, glm::vec2 const &Rotate)
+{
+    glm::mat4 Projection = glm::perspective(45.0f, 4.0f / 3.0f, 0.1f, 100.f);
+    glm::mat4 ViewTranslate = glm::translate(glm::mat4(1.0f), glm::vec3(Translate.x, Translate.y, Translate.z));
+    glm::mat4 ViewRotateX = glm::rotate(ViewTranslate, Rotate.y, glm::vec3(-1.0f, 0.0f, 0.0f));
+    glm::mat4 View = glm::rotate(ViewRotateX, Rotate.x, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+    glm::mat4 MVP = Projection * View * Model;
+    glUniformMatrix4fv(LocationMVP, 1, GL_FALSE, glm::value_ptr(MVP));
+}
 // rotate_x_axis()
 // rotate_y_axis()
 // rotate_z_axis()
