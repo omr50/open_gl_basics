@@ -48,6 +48,8 @@ float translate_x = 0;
 float translate_y = 0;
 float translate_z = 0;
 
+glm::vec3 cameraPosition;
+
 float yaw = 0;
 float pitch = 0;
 bool mouse_mode = false;
@@ -245,7 +247,7 @@ void mainloop()
         // glUniformMatrix3fv(matrix_y, 1, GL_FALSE, rotation_y);
         // glUniformMatrix3fv(matrix_z, 1, GL_FALSE, rotation_z);
         GLuint mvp_matrix = glGetUniformLocation(shader_program, "mvp_matrix");
-        set_mvp_matrix(mvp_matrix, {translate_x, translate_y, translate_z}, {pitch / 180 * 3.1415, yaw / 180 * 3.1415});
+        set_mvp_matrix(mvp_matrix, cameraPosition, {pitch / 180 * 3.1415, yaw / 180 * 3.1415});
         angle += ((3.1415 / 180));
         glUseProgram(shader_program);
         draw_cube(cube);
@@ -264,29 +266,41 @@ void window_events()
     {
         if (e.type == SDL_KEYDOWN)
         {
-            if (e.key.keysym.sym == SDLK_w)
+            // Compute forward, right, and up vectors based on camera rotation
+            glm::vec3 forward(
+                cos(glm::radians(yaw)) * cos(glm::radians(pitch)),
+                sin(glm::radians(pitch)),
+                sin(glm::radians(yaw)) * cos(glm::radians(pitch)));
+            forward = glm::normalize(forward);
+
+            glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+            glm::vec3 up = glm::normalize(glm::cross(right, forward));
+            float movementSpeed = 0.04;
+            auto key = e.key.keysym.sym;
+            // Update position based on key input
+            if (key == SDLK_w)
             {
-                translate_z += 0.04;
+                cameraPosition += (forward * movementSpeed); // Move forward
             }
-            if (e.key.keysym.sym == SDLK_d)
+            if (key == SDLK_s)
             {
-                translate_x -= 0.04;
+                cameraPosition -= forward * movementSpeed; // Move backward
             }
-            if (e.key.keysym.sym == SDLK_a)
+            if (key == SDLK_a)
             {
-                translate_x += 0.04;
+                cameraPosition -= right * movementSpeed; // Move left
             }
-            if (e.key.keysym.sym == SDLK_s)
+            if (key == SDLK_d)
             {
-                translate_z -= 0.04;
+                cameraPosition += right * movementSpeed; // Move right
             }
-            if (e.key.keysym.sym == SDLK_SPACE)
+            if (key == SDLK_SPACE)
             {
-                translate_y -= 0.04;
+                cameraPosition += up * movementSpeed; // Move up
             }
-            if (e.key.keysym.sym == SDLK_LSHIFT)
+            if (key == SDLK_LSHIFT)
             {
-                translate_y += 0.04;
+                cameraPosition -= up * movementSpeed; // Move down
             }
             if (e.key.keysym.sym == SDLK_x)
             {
@@ -327,10 +341,9 @@ void window_events()
             float deltaY = y - screenCenterY;
 
             // Update camera angles based on mouse movement
-            yaw += deltaX * 0.15;
-            pitch += deltaY * 0.15;
+            yaw += deltaX * 0.5;
+            pitch += deltaY * 0.5;
             pitch = glm::clamp(pitch, -89.0f, 89.0f);
-            yaw = glm::clamp(yaw, -180.0f, 180.0f);
             printf("(%d, %d)\n", pitch, yaw);
             if (mouse_mode)
             {
@@ -340,7 +353,6 @@ void window_events()
         }
     }
 }
-
 void set_cube_vao_vbo(Cube *cube, GLuint indices[])
 {
     glGenVertexArrays(1, &cube->vao);
@@ -505,17 +517,26 @@ void get_z_rotation_matrix(GLfloat *matrix, float angle)
 
 void set_mvp_matrix(GLuint LocationMVP, glm::vec3 Translate, glm::vec2 const &Rotate)
 {
+    glm::vec3 forward;
+    forward.x = cos(glm::radians(Rotate.y)) * cos(glm::radians(Rotate.x));
+    forward.y = sin(glm::radians(Rotate.x));
+    forward.z = sin(glm::radians(Rotate.y)) * cos(glm::radians(Rotate.x));
+    forward = glm::normalize(forward);
 
-    glm::mat4 Projection = glm::perspective(45.0f, 4.0f / 3.0f, 0.1f, 100.f);
-    // glm::mat4 ViewRotateX = glm::rotate(glm::mat4(1.0f), Rotate.x, glm::vec3(1.0f, 0.0f, 0.0f));
-    // glm::mat4 ViewRotateY = glm::rotate(ViewRotateX, Rotate.y, glm::vec3(0.0f, 1.0f, 0.0f));
-    // glm::mat4 ViewTranslate = glm::translate(ViewRotateY, Translate); // Negate translation
+    // Apply translation in world space
+    // glm::vec3 adjustedTranslate = Translate + forward;
+    // Projection matrix
+    glm::mat4 Projection = glm::perspective(glm::radians(45.0f), 4.0f / 3.0f, 0.1f, 100.f);
 
-    glm::mat4 ViewRotateX = glm::rotate(glm::mat4(1.0f), Rotate.x, glm::vec3(1.0f, 0.0f, 0.0f));
-    glm::mat4 ViewRotateY = glm::rotate(ViewRotateX, Rotate.y, glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 ViewTranslate = glm::translate(ViewRotateY, glm::vec3(Translate.x, Translate.y, Translate.z));
-    glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
-    glm::mat4 MVP = Projection * ViewRotateY * Model;
+    // View matrix (camera transformations)
+    glm::mat4 ViewRotateX = glm::rotate(glm::mat4(1.0f), glm::radians(Rotate.x), glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch
+    glm::mat4 ViewRotateY = glm::rotate(ViewRotateX, glm::radians(Rotate.y), glm::vec3(0.0f, 1.0f, 0.0f));     // Yaw
+    glm::mat4 View = glm::translate(ViewRotateY, Translate);                                                   // Negate for camera
+
+    // Model matrix (object transformations)
+
+    // Final MVP matrix
+    glm::mat4 MVP = Projection * View;
     glUniformMatrix4fv(LocationMVP, 1, GL_FALSE, glm::value_ptr(MVP));
 }
 
