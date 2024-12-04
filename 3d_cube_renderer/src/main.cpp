@@ -247,8 +247,8 @@ void mainloop()
         // glUniformMatrix3fv(matrix_y, 1, GL_FALSE, rotation_y);
         // glUniformMatrix3fv(matrix_z, 1, GL_FALSE, rotation_z);
         GLuint mvp_matrix = glGetUniformLocation(shader_program, "mvp_matrix");
-        set_mvp_matrix(mvp_matrix, cameraPosition, {pitch / 180 * 3.1415, yaw / 180 * 3.1415});
-        angle += ((3.1415 / 180));
+        set_mvp_matrix(mvp_matrix, cameraPosition, {glm::radians(pitch), glm::radians(yaw)});
+
         glUseProgram(shader_program);
         draw_cube(cube);
         SDL_Delay(1);
@@ -517,11 +517,6 @@ void get_z_rotation_matrix(GLfloat *matrix, float angle)
 
 void set_mvp_matrix(GLuint LocationMVP, glm::vec3 Translate, glm::vec2 const &Rotate)
 {
-    glm::vec3 forward;
-    forward.x = cos(glm::radians(Rotate.y)) * cos(glm::radians(Rotate.x));
-    forward.y = sin(glm::radians(Rotate.x));
-    forward.z = sin(glm::radians(Rotate.y)) * cos(glm::radians(Rotate.x));
-    forward = glm::normalize(forward);
 
     // Apply translation in world space
     // glm::vec3 adjustedTranslate = Translate + forward;
@@ -531,7 +526,7 @@ void set_mvp_matrix(GLuint LocationMVP, glm::vec3 Translate, glm::vec2 const &Ro
     // View matrix (camera transformations)
     glm::mat4 ViewRotateX = glm::rotate(glm::mat4(1.0f), glm::radians(Rotate.x), glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch
     glm::mat4 ViewRotateY = glm::rotate(ViewRotateX, glm::radians(Rotate.y), glm::vec3(0.0f, 1.0f, 0.0f));     // Yaw
-    glm::mat4 View = glm::translate(ViewRotateY, Translate);                                                   // Negate for camera
+    glm::mat4 View = glm::translate(ViewRotateY, -Translate);                                                  // Negate for camera
 
     // Model matrix (object transformations)
 
