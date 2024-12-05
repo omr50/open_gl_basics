@@ -1,4 +1,6 @@
 #include "../include/init_and_logic.hpp"
+#include "../include/Entities.hpp"
+#include "../include/shaders.hpp"
 #include <GL/glew.h>
 #include <iostream>
 
@@ -51,15 +53,34 @@ void init_gl_sdl()
 void main_loop()
 {
 
+    // create shader and use program
+    GLuint shader_program = create_program("./basicShader.vs", "./basicShader.fs");
+    glUseProgram(shader_program);
+
+    printf("here after creation of cube\n");
+    Cube *cube = create_cube();
+    for (int i = 0; i < 8; i++)
+    {
+        printf("Vertex %d: %f, %f, %f\n", i, cube->vertices[3 * i], cube->vertices[3 * i + 1], cube->vertices[3 * i + 2]);
+    }
+
     while (running)
     {
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         sdl_event_handler();
         // eventually remove delay once we do frame rates
         // or have a delay to ensure each frame isn't too quick.
+
+        draw_cube(cube);
+        // glDrawArrays(GL_POINTS, 0, 8);
+
+        SDL_GL_SwapWindow(window);
         SDL_Delay(5);
     }
     SDL_DestroyWindow(window);
     SDL_Quit();
+
     exit(0);
 }
 
