@@ -10,8 +10,8 @@ struct Camera
 
 struct Cube
 {
-    glm::vec4 vertices[8];
-    glm::vec3 indices[8];
+    float *vertices;
+    float *indices;
     glm::mat4 model_matrix;
     GLuint vbo;
     GLuint vao;
@@ -22,3 +22,7 @@ void create_vbo_vao_ebo_cube(Cube *cube);
 void buffer_cube_data();
 glm::vec4 cube_to_world_space(Cube *cube);
 Cube *create_cube();
+GLfloat *create_cube_vertices(glm::vec3 start_coord, float side_len);
+
+void bind_and_update_cube(Cube *cube);
+void draw_cube(Cube *cube);
