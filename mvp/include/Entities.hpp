@@ -3,7 +3,7 @@
 
 struct Camera
 {
-    glm::vec4 position;
+    glm::vec3 position;
     float rotation_angle_rad;
     float view_angle;
 };
@@ -22,7 +22,10 @@ void create_vbo_vao_ebo_cube(Cube *cube);
 void buffer_cube_data();
 glm::vec4 cube_to_world_space(Cube *cube);
 Cube *create_cube();
+Camera *create_camera();
 GLfloat *create_cube_vertices(glm::vec3 start_coord, float side_len);
 
 void bind_and_update_cube(Cube *cube);
 void draw_cube(Cube *cube);
+void get_new_camera_position(Camera *camera, glm::vec3 direction);
+glm::mat4 create_view_matrix(Camera *camera);
