@@ -11,5 +11,6 @@ void init_gl_sdl();
 void main_loop();
 void sdl_event_handler();
 void keyboard_handler(SDL_Event e);
-void mouse_handler(SDL_Event e);
+void mouse_movement_handler(SDL_Event e);
+void mouse_click_handler(SDL_Event e);
 void window_event_handler(SDL_Event e);

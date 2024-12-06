@@ -1,51 +1,63 @@
 #include "../include/Entities.hpp"
+#include "../include/init_and_logic.hpp"
 #include <iostream>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/euler_angles.hpp>
 
-void create_vbo_vao_ebo_cube(Cube *cube)
+extern float yaw;
+extern float pitch;
+extern float roll;
+GLuint cube_vbo, cube_vao, cube_ebo;
+GLfloat *cube_vertices = create_cube_vertices({0.0f, 0.0f, -1.0f}, 1.0f);
+#define SIDE_LENGTH 1.0f
+
+GLuint cube_indices[] = {
+    0, 1, 1, 3, 3, 2, 2, 0,
+    4, 5, 5, 7, 7, 6, 6, 4,
+    0, 4, 1, 5, 3, 7, 2, 6};
+
+void create_vbo_vao_ebo_cube()
 {
-    glGenVertexArrays(1, &cube->vao);
-    glGenBuffers(1, &cube->vbo);
-    glGenBuffers(1, &cube->ebo);
-    glBindVertexArray(cube->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, cube->vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube->vertices, GL_STATIC_DRAW);
+    glGenVertexArrays(1, &cube_vao);
+    glGenBuffers(1, &cube_vbo);
+    glGenBuffers(1, &cube_ebo);
+    glBindVertexArray(cube_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube_vertices, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
     glEnableVertexAttribArray(0);
 
-    GLuint cube_indices[] = {
-        0, 1, 1, 3, 3, 2, 2, 0,
-        4, 5, 5, 7, 7, 6, 6, 4,
-        0, 4, 1, 5, 3, 7, 2, 6};
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube->ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 24, cube_indices, GL_STATIC_DRAW);
 
     printf("created vbo vao ebo\n");
 }
+
 void buffer_cube_data(Cube *cube)
 {
-    glBindBuffer(GL_ARRAY_BUFFER, cube->vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube->vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube_vertices, GL_STATIC_DRAW);
     glBindVertexArray(0);
     printf("buffer cube data\n");
 }
 glm::vec4 cube_to_world_space(Cube *cube)
 {
 }
-Cube *create_cube()
+Cube *create_cube(int x, int y)
 {
     printf("1?\n");
     Cube *cube = (Cube *)malloc(sizeof(Cube));
     printf("2?\n");
     // cube->vertices = create_cube_vertices({0.3, 0.3, 0.3}, 0.2);
     // cube->vertices = create_cube_vertices({0.0f, 0.0f, -3.0f}, 0.2f);
-    cube->vertices = create_cube_vertices({0.0f, 0.0f, -1.0f}, 1.0f); // Place cube at z = -1.0f
+    cube->vertices = create_cube_vertices({0.0f, 0.0f, -1.0f}, SIDE_LENGTH); // Place cube at z = -1.0f
 
     printf("3?\n");
-    create_vbo_vao_ebo_cube(cube);
+    cube->vbo = cube_vbo;
+    cube->vao = cube_vao;
+    cube->ebo = cube_ebo;
+    cube->model_matrix = create_cube_model_matrix(cube, x, y);
     printf("created cube\n");
     return cube;
 }
@@ -75,18 +87,20 @@ GLfloat *create_cube_vertices(glm::vec3 start_coord, float side_len)
 
 void bind_and_update_cube(Cube *cube)
 {
-    glBindVertexArray(cube->vao);
-    glBindBuffer(GL_ARRAY_BUFFER, cube->vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube->ebo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube->vertices, GL_STATIC_DRAW);
-    glBindVertexArray(cube->vao);
+    glBindVertexArray(cube_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube_vertices, GL_STATIC_DRAW);
+    glBindVertexArray(cube_vao);
     printf("binded and updated cube\n");
 }
 
 void draw_cube(Cube *cube)
 {
     bind_and_update_cube(cube);
+    printf("1?\n");
     glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);
+    printf("2?\n");
     printf("drawn cube\n");
 }
 
@@ -102,7 +116,7 @@ Camera *create_camera()
 
 void get_new_camera_position(Camera *camera, glm::vec3 direction)
 {
-    glm::mat4 camera_rotation_matrix = glm::yawPitchRoll(0, 0, 0);
+    glm::mat4 camera_rotation_matrix = glm::yawPitchRoll(yaw, pitch, roll);
     float speed = 0.07;
     glm::vec3 translation_amount = glm::vec3(camera_rotation_matrix * glm::vec4(direction, 1.0)) * speed;
     camera->position += translation_amount;
@@ -116,11 +130,17 @@ glm::mat4 create_view_matrix(Camera *camera)
     // get the inverse position to apply to objects
     glm::mat4 translation_matrix = glm::translate(glm::mat4(1.0f), -(camera->position));
 
-    glm::mat4 camera_rotation_matrix = glm::yawPitchRoll(0, 0, 0);
+    glm::mat4 camera_rotation_matrix = glm::yawPitchRoll(yaw, pitch, roll);
     glm::mat4 inversed_rotation = glm::transpose(camera_rotation_matrix);
 
     // translation applied first but inverse order in terms of the multiplication
     return inversed_rotation * translation_matrix;
+}
+
+glm::mat4 create_cube_model_matrix(Cube *cube, int offset_x, int offset_y)
+{
+    glm::mat4 translation_matrix = glm::translate(glm::vec3(offset_x, offset_y, -1.0f));
+    return translation_matrix;
 }
 
 // glm::mat4 create_view_matrix(Camera *camera)

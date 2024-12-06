@@ -4,10 +4,11 @@
 #include <GL/glew.h>
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
+#include <vector>
 
 SDL_Window *window = nullptr;
-bool running = true;
-
+bool running = true, software_mouse_move_event = false, centered = true;
+float yaw, pitch, roll;
 glm::vec3 direction_vector;
 void init_window()
 {
@@ -62,9 +63,15 @@ void main_loop()
     // create shader and use program
     GLuint shader_program = create_program("./basicShader.vs", "./basicShader.fs");
     glUseProgram(shader_program);
-
+    create_vbo_vao_ebo_cube();
     printf("here after creation of cube\n");
-    Cube *cube = create_cube();
+    std::vector<Cube *> cubes;
+    for (int i = 0; i < 4; i++)
+    {
+
+        for (int j = 0; j < 4; j++)
+            cubes.push_back(create_cube(i, j));
+    }
     Camera *camera = create_camera();
     // for (int i = 0; i < 8; i++)
     // {
@@ -86,35 +93,37 @@ void main_loop()
         float far_plane = 100.0f;
 
         glm::mat4 projection_matrix = glm::perspective(fov, aspect_ratio, near_plane, far_plane);
-
-        glm::mat4 MVP = projection_matrix * view_matrix;
-
-        for (int i = 0; i < 8; i++)
+        for (auto &cube : cubes)
         {
-            glm::vec4 temp_pos = glm::vec4(cube->vertices[i * 3 + 0], // X
-                                           cube->vertices[i * 3 + 1], // Y
-                                           cube->vertices[i * 3 + 2], // Z
-                                           1.0);                      // W
-            glm::vec4 clip_pos = MVP * temp_pos;
-            glm::vec3 ndc_pos = glm::vec3(clip_pos) / clip_pos.w;
-            printf("Transformed Vertex %d: Clip Space: (%f, %f, %f, %f), NDC: (%f, %f, %f)\n",
-                   i, clip_pos.x, clip_pos.y, clip_pos.z, clip_pos.w,
-                   ndc_pos.x, ndc_pos.y, ndc_pos.z);
+            glm::mat4 MVP = projection_matrix * view_matrix * cube->model_matrix;
+
+            // for (int i = 0; i < 8; i++)
+            // {
+            //     glm::vec4 temp_pos = glm::vec4(cube->vertices[i * 3 + 0], // X
+            //                                    cube->vertices[i * 3 + 1], // Y
+            //                                    cube->vertices[i * 3 + 2], // Z
+            //                                    1.0);                      // W
+            //     glm::vec4 clip_pos = MVP * temp_pos;
+            //     glm::vec3 ndc_pos = glm::vec3(clip_pos) / clip_pos.w;
+            //     printf("Transformed Vertex %d: Clip Space: (%f, %f, %f, %f), NDC: (%f, %f, %f)\n",
+            //            i, clip_pos.x, clip_pos.y, clip_pos.z, clip_pos.w,
+            //            ndc_pos.x, ndc_pos.y, ndc_pos.z);
+            // }
+
+            GLuint mvp_location = glGetUniformLocation(shader_program, "mvp");
+            if (mvp_location == -1)
+            {
+                std::cerr << "Error: Uniform 'mvp' not found!" << std::endl;
+                exit(EXIT_FAILURE);
+            }
+            glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(MVP));
+            printf("GOt here!?\n");
+            // eventually remove delay once we do frame rates
+            // or have a delay to ensure each frame isn't too quick.
+
+            draw_cube(cube);
+            // glDrawArrays(GL_POINTS, 0, 8);
         }
-
-        GLuint mvp_location = glGetUniformLocation(shader_program, "mvp");
-        if (mvp_location == -1)
-        {
-            std::cerr << "Error: Uniform 'mvp' not found!" << std::endl;
-            exit(EXIT_FAILURE);
-        }
-        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, glm::value_ptr(MVP));
-        // eventually remove delay once we do frame rates
-        // or have a delay to ensure each frame isn't too quick.
-
-        draw_cube(cube);
-        // glDrawArrays(GL_POINTS, 0, 8);
-
         SDL_GL_SwapWindow(window);
         SDL_Delay(5);
     }
@@ -137,7 +146,11 @@ void sdl_event_handler()
         }
         else if (e.type == SDL_MOUSEMOTION)
         {
-            mouse_handler(e);
+            mouse_movement_handler(e);
+        }
+        else if (e.type == SDL_MOUSEBUTTONDOWN)
+        {
+            mouse_click_handler(e);
         }
         // later these events may be split into more distinct functions
         else if (e.type == SDL_WINDOWEVENT)
@@ -178,15 +191,53 @@ void keyboard_handler(SDL_Event e)
     }
     else if (key == SDLK_LSHIFT)
     {
-
         direction_vector = {0.0, -1.0, 0.0};
+    }
+    else if (key == SDLK_ESCAPE)
+    {
+        centered = false;
+    }
+    else if (key == SDLK_x)
+    {
+        centered = true;
     }
 }
 
-void mouse_handler(SDL_Event e)
+void mouse_movement_handler(SDL_Event e)
 {
+    if (software_mouse_move_event)
+    {
+        software_mouse_move_event = false;
+        return;
+    }
     int x, y;
     SDL_GetMouseState(&x, &y);
+
+    float width_center = (float)WIDTH / 2.0f;
+    float height_center = (float)HEIGHT / 2.0f;
+    float mouse_displacement_x = x - width_center;
+    float mouse_displacement_y = y - height_center;
+    yaw -= (mouse_displacement_x * 0.001);
+    pitch -= (mouse_displacement_y * 0.001);
+    yaw = glm::clamp(yaw, -90.0f, 90.0f);
+
+    if (centered)
+    {
+        SDL_WarpMouseInWindow(window, width_center, height_center);
+        software_mouse_move_event = true;
+    }
+}
+
+void mouse_click_handler(SDL_Event e)
+{
+    if (e.button.button == SDL_BUTTON_LEFT)
+    {
+        roll += (0.01);
+    }
+    else if (e.button.button == SDL_BUTTON_RIGHT)
+    {
+        roll -= (0.01);
+    }
 }
 
 void window_event_handler(SDL_Event e)
