@@ -80,6 +80,10 @@ void main_loop()
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
+    //     glEnable(GL_DEPTH_TEST);
+    // glEnable(GL_CULL_FACE);
+    // glCullFace(GL_BACK);
+
     while (running)
     {
 
@@ -91,24 +95,16 @@ void main_loop()
         float aspect_ratio = static_cast<float>(WIDTH) / static_cast<float>(HEIGHT);
         float near_plane = 0.1f;
         float far_plane = 100.0f;
+        glUniform1i(glGetUniformLocation(shader_program, "ourTexture"), 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, cubes[0]->texture_id);
+        GLint texLoc = glGetUniformLocation(shader_program, "ourTexture");
+        glUniform1i(texLoc, 0);
 
         glm::mat4 projection_matrix = glm::perspective(fov, aspect_ratio, near_plane, far_plane);
         for (auto &cube : cubes)
         {
             glm::mat4 MVP = projection_matrix * view_matrix * cube->model_matrix;
-
-            // for (int i = 0; i < 8; i++)
-            // {
-            //     glm::vec4 temp_pos = glm::vec4(cube->vertices[i * 3 + 0], // X
-            //                                    cube->vertices[i * 3 + 1], // Y
-            //                                    cube->vertices[i * 3 + 2], // Z
-            //                                    1.0);                      // W
-            //     glm::vec4 clip_pos = MVP * temp_pos;
-            //     glm::vec3 ndc_pos = glm::vec3(clip_pos) / clip_pos.w;
-            //     printf("Transformed Vertex %d: Clip Space: (%f, %f, %f, %f), NDC: (%f, %f, %f)\n",
-            //            i, clip_pos.x, clip_pos.y, clip_pos.z, clip_pos.w,
-            //            ndc_pos.x, ndc_pos.y, ndc_pos.z);
-            // }
 
             GLuint mvp_location = glGetUniformLocation(shader_program, "mvp");
             if (mvp_location == -1)
@@ -121,7 +117,21 @@ void main_loop()
             // eventually remove delay once we do frame rates
             // or have a delay to ensure each frame isn't too quick.
 
-            draw_cube(cube);
+            glBindVertexArray(cube->vao);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            // for (int i = 0; i < 8; i++)
+            // {
+            //     glm::vec4 temp_pos = glm::vec4(cube->vertices[i * 3 + 0], // X
+            //                                    cube->vertices[i * 3 + 1], // Y
+            //                                    cube->vertices[i * 3 + 2], // Z
+            //                                    1.0);                      // W
+            //     glm::vec4 clip_pos = MVP * temp_pos;
+            //     glm::vec3 ndc_pos = glm::vec3(clip_pos) / clip_pos.w;
+            //     printf("Transformed Vertex %d: Clip Space: (%f, %f, %f, %f), NDC: (%f, %f, %f)\n",
+            //            i, clip_pos.x, clip_pos.y, clip_pos.z, clip_pos.w,
+            //            ndc_pos.x, ndc_pos.y, ndc_pos.z);
+            // }
+            // draw_cube(cube);
             // glDrawArrays(GL_POINTS, 0, 8);
         }
         SDL_GL_SwapWindow(window);

@@ -16,6 +16,7 @@ struct Cube
     GLuint vbo;
     GLuint vao;
     GLuint ebo;
+    GLuint texture_id;
 };
 
 void create_vbo_vao_ebo_cube();

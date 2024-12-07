@@ -4,13 +4,65 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/euler_angles.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
 extern float yaw;
 extern float pitch;
 extern float roll;
-GLuint cube_vbo, cube_vao, cube_ebo;
+GLuint cube_vbo, cube_vao, cube_ebo, texture_id;
 GLfloat *cube_vertices = create_cube_vertices({0.0f, 0.0f, -1.0f}, 1.0f);
 #define SIDE_LENGTH 1.0f
+
+// Each vertex: position (x, y, z), texture coord (u, v)
+float cube_triangle_vertices[] = {
+    // Front face
+    -0.5f, -0.5f, +0.5f, 0.0f, 0.0f,
+    +0.5f, -0.5f, +0.5f, 1.0f, 0.0f,
+    +0.5f, +0.5f, +0.5f, 1.0f, 1.0f,
+    +0.5f, +0.5f, +0.5f, 1.0f, 1.0f,
+    -0.5f, +0.5f, +0.5f, 0.0f, 1.0f,
+    -0.5f, -0.5f, +0.5f, 0.0f, 0.0f,
+
+    // Back face
+    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+    -0.5f, +0.5f, -0.5f, 0.0f, 1.0f,
+    +0.5f, +0.5f, -0.5f, 1.0f, 1.0f,
+    +0.5f, +0.5f, -0.5f, 1.0f, 1.0f,
+    +0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+
+    // Left face
+    -0.5f, +0.5f, +0.5f, 1.0f, 0.0f,
+    -0.5f, +0.5f, -0.5f, 1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    -0.5f, -0.5f, +0.5f, 0.0f, 0.0f,
+    -0.5f, +0.5f, +0.5f, 1.0f, 0.0f,
+
+    // Right face
+    +0.5f, +0.5f, +0.5f, 1.0f, 0.0f,
+    +0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    +0.5f, +0.5f, -0.5f, 1.0f, 1.0f,
+    +0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    +0.5f, +0.5f, +0.5f, 1.0f, 0.0f,
+    +0.5f, -0.5f, +0.5f, 0.0f, 0.0f,
+
+    // Bottom face
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+    +0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
+    +0.5f, -0.5f, +0.5f, 1.0f, 0.0f,
+    +0.5f, -0.5f, +0.5f, 1.0f, 0.0f,
+    -0.5f, -0.5f, +0.5f, 0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+
+    // Top face
+    -0.5f, +0.5f, -0.5f, 0.0f, 1.0f,
+    -0.5f, +0.5f, +0.5f, 0.0f, 0.0f,
+    +0.5f, +0.5f, +0.5f, 1.0f, 0.0f,
+    +0.5f, +0.5f, +0.5f, 1.0f, 0.0f,
+    +0.5f, +0.5f, -0.5f, 1.0f, 1.0f,
+    -0.5f, +0.5f, -0.5f, 0.0f, 1.0f};
 
 GLuint cube_indices[] = {
     0, 1, 1, 3, 3, 2, 2, 0,
@@ -22,14 +74,57 @@ void create_vbo_vao_ebo_cube()
     glGenVertexArrays(1, &cube_vao);
     glGenBuffers(1, &cube_vbo);
     glGenBuffers(1, &cube_ebo);
+
     glBindVertexArray(cube_vao);
     glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * 24, cube_vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
-    glEnableVertexAttribArray(0);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_triangle_vertices), cube_triangle_vertices, GL_STATIC_DRAW);
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 24, cube_indices, GL_STATIC_DRAW);
+    // Position attribute (3 floats)
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+
+    // Texture coordinate attribute (2 floats)
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
+    glBindVertexArray(0);
+
+    int width, height, nrChannels;
+    unsigned char *data = stbi_load("dirt.png", &width, &height, &nrChannels, 0);
+    if (!data)
+    {
+        std::cerr << "Failed to load texture" << std::endl;
+        // Handle error...
+    }
+
+    printf("is null? %x\n", data);
+
+    // Generate and bind texture
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    texture_id = textureID;
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Set texture parameters for wrapping and filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Upload texture data to GPU
+    // If your image has an alpha channel, use GL_RGBA instead of GL_RGB.
+    GLenum format = GL_RGB;
+    if (nrChannels == 4)
+    {
+        format = GL_RGBA;
+    }
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // free image after it’s uploaded
+    stbi_image_free(data);
+
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cube_ebo);
+    // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * 24, cube_indices, GL_STATIC_DRAW);
 
     printf("created vbo vao ebo\n");
 }
@@ -41,9 +136,9 @@ void buffer_cube_data(Cube *cube)
     glBindVertexArray(0);
     printf("buffer cube data\n");
 }
-glm::vec4 cube_to_world_space(Cube *cube)
-{
-}
+// glm::vec4 cube_to_world_space(Cube *cube)
+// {
+// }
 Cube *create_cube(int x, int y)
 {
     printf("1?\n");
@@ -57,6 +152,7 @@ Cube *create_cube(int x, int y)
     cube->vbo = cube_vbo;
     cube->vao = cube_vao;
     cube->ebo = cube_ebo;
+    cube->texture_id = texture_id;
     cube->model_matrix = create_cube_model_matrix(cube, x, y);
     printf("created cube\n");
     return cube;
